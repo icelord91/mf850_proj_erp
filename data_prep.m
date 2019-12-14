@@ -7,6 +7,17 @@ function T = data_prep(varargin)
     % basic transform
     T.Date = datetime(T.Date);
     T.Sector = arrayfun(@categorize, T.Industry, 'UniformOutput', false);
+    T = sortrows(T, {'compid', 'Date'});
+    
+    % basic cleaning
+    loc = abs(T.RETMONTH) > 1;
+    T(loc, 'RETMONTH') = array2table(nan([sum(loc), 1]));
+    loc = abs(T.retmonth_spx) > 1;
+    T(loc, 'retmonth_spx') = array2table(nan([sum(loc), 1]));
+    loc = T.realized_vol_spx < 0;
+    T(loc, 'realized_vol_spx') = array2table(nan([sum(loc), 1]));
+    
+    % save trimmed data
     save('rawdata.mat', 'T')
     
 end
@@ -14,18 +25,18 @@ end
 function sector = categorize(industry)
 
     majors = {
-        'consumer discretionary', 
-        'consumer staples',
-        'energy',
-        'materials',
-        'industrials',
-        'healthcare',
-        'financials',
-        'information technology',
-        'real estate',
-        'communication services',
-        'utilities',
-        'other'
+        'ConsumerDiscretionary', 
+        'ConsumerStaples',
+        'Energy',
+        'Materials',
+        'Industrials',
+        'Healthcare',
+        'Financials',
+        'InformationTechnology',
+        'RealEstate',
+        'CommunicationServices',
+        'Utilities',
+        'Other'
     };
 
     minors = {
