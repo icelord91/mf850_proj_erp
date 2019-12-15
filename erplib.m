@@ -1,10 +1,9 @@
 
 classdef erplib
     
-    % TECHNICAL ANALYSIS ALGORITHM
+    % TECHNICAL ANALYSIS BASIC FORMULA
     methods (Static)
 
-        % BASIC FORMULA
         % Shift series
         function ts_ = shift(ts, n)
             
@@ -33,7 +32,6 @@ classdef erplib
                 mu(i) = mu(i-1) * (i-1) / i + ts(i) / i;
             end;
 
-
         end
 
         % Standard deviation
@@ -47,7 +45,6 @@ classdef erplib
             for i = 2:min(n-1, numel(ts))
                 sigma(i) = std(ts(1:i), 1);
             end;
-
 
         end
 
@@ -63,6 +60,35 @@ classdef erplib
             % first term (number) correction
             tr(:,len) = tr(:,len) + beta .^ [len:-1:1]';
             ema_ = flip(tr * flip(ts));
+
+        end
+        
+        % Trim
+        function x_ = trim(x, varargin)
+            
+            l = -1;
+            r = 2;
+            if nargin > 2
+                l = range(1);
+                r = range(2);
+            elseif nargin > 1
+                r = range(1);
+            end;
+            
+            x_ = nan(size(x));
+            mu = nanmean(x);
+            sig = nanstd(x);
+            loc = (abs(x - mu) > l * sig) & (abs(x - mu) < r * sig);
+            x_(loc, :) = x(loc, :);
+            
+        end
+        
+        % Normalization
+        function x_ = normalize(x)
+            
+            mu = nanmean(x);
+            sig = nanstd(x);
+            x_ = (x - mu) ./ sig;
 
         end
         

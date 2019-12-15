@@ -16,6 +16,8 @@ function T = data_prep(varargin)
     T(loc, 'retmonth_spx') = array2table(nan([sum(loc), 1]));
     loc = T.realized_vol_spx < 0;
     T(loc, 'realized_vol_spx') = array2table(nan([sum(loc), 1]));
+    loc = T.rnd < 0;
+    T(loc, 'rnd') = array2table(nan([sum(loc), 1]));
     
     % save trimmed data
     save('rawdata.mat', 'T')
