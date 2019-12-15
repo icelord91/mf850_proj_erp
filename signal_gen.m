@@ -4,7 +4,7 @@
     cids = unique(T.compid); % company id's
     shape = [height(T), 1]; % signal shape
     
-    ver = str2double(regexp(version, '^\d+.\d+', 'match')); % check matlab version
+%     ver = str2double(regexp(version, '^\d+.\d+', 'match')); % check matlab version
     
     days = unique(T.Date);
     H = length(days);
@@ -90,7 +90,7 @@
     S = array2table(nan([H, W]));
     S.Properties.VariableNames = {'Date', sectors{:}};
     S.Date = days;
-    M = table(T.Date, mom1m, 'VariableNames', {'Date', 'mom1m'});
+    M = table(T.Date, mom1m, 'VariableNames', {'Date', 'mom1m'}); % industry benchmark
     for j = 1:length(sectors) % cross-sectional calculation
         block = M(strcmp(T.Sector, sectors(j)), :);
         S(:, sectors(j)) = ...
@@ -124,11 +124,12 @@
         res = func(tmpl);
         beta(loc) = res(pos, :);
     end;
+    beta = real(beta);
     
     
     % volatility
     gvol = nan(shape);
-    func = @(ts) erplib.ma(ts.mom1m .^ 2, 3);
+    func = @(ts) log(erplib.ma(ts.mom1m .^ 2, 3));
     days = unique(T.Date);
     H = length(days);
     W = 2;
@@ -146,7 +147,7 @@
     end;
     
     idiovol = nan(shape);
-    func = @(ts) erplib.ma((ts.mom1m - ts.indmom) .^ 2, 3);
+    func = @(ts) log(erplib.ma((ts.mom1m - ts.indmom) .^ 2, 3));
     days = unique(T.Date);
     H = length(days);
     W = 3;
@@ -164,7 +165,7 @@
     end;
     
     vol3m = nan(shape);
-    func = @(ts) erplib.shift(erplib.ma((ts.RETMONTH - ts.retmonth_spx) .^ 2, 3), 1);
+    func = @(ts) log(erplib.shift(erplib.ma((ts.RETMONTH - ts.retmonth_spx) .^ 2, 3), 1));
     tmpl = template;
     for j = 1:length(cids)
         loc = logical(T.compid == cids(j));
@@ -176,7 +177,7 @@
     end;
     
     vol6m = nan(shape);
-    func = @(ts) erplib.shift(erplib.ma((ts.RETMONTH - ts.retmonth_spx) .^ 2, 6), 1);
+    func = @(ts) log(erplib.shift(erplib.ma((ts.RETMONTH - ts.retmonth_spx) .^ 2, 6), 1));
     tmpl = template;
     for j = 1:length(cids)
         loc = logical(T.compid == cids(j));
@@ -187,10 +188,54 @@
         vol6m(loc) = res(pos, :);
     end;
     
+    indvol = nan(shape);
+    days = unique(T.Date);
+    sectors = unique(T.Sector);
+    H = length(days);
+    W = 1 + length(sectors);
+    S = array2table(nan([H, W]));
+    S.Properties.VariableNames = {'Date', sectors{:}};
+    S.Date = days;
+    M = table(T.Date, idiovol, 'VariableNames', {'Date', 'idiovol'});
+    for j = 1:length(sectors) % cross-sectional
+        block = M(strcmp(T.Sector, sectors(j)), :);
+        S(:, sectors(j)) = ...
+            array2table(arrayfun(@(day) nanmean(block(block.Date == day, :).idiovol), days));
+    end;
+    for j = 1:length(cids)
+        loc = logical(T.compid == cids(j));
+        ts = T(loc, :);
+        pos = ismember(S.Date, ts.Date);
+        res = S(:, ts.Sector(1));
+        indvol(loc) = table2array(res(pos, :));
+    end;
+    
     
     % size
     sz = log(T.marketcap);
     sznl = log(T.marketcap) .^ 3;
+    
+    indsz = nan(shape);
+    days = unique(T.Date);
+    sectors = unique(T.Sector);
+    H = length(days);
+    W = 1 + length(sectors);
+    S = array2table(nan([H, W]));
+    S.Properties.VariableNames = {'Date', sectors{:}};
+    S.Date = days;
+    M = table(T.Date, sz, 'VariableNames', {'Date', 'sz'});
+    for j = 1:length(sectors) % cross-sectional
+        block = M(strcmp(T.Sector, sectors(j)), :);
+        S(:, sectors(j)) = ...
+            array2table(arrayfun(@(day) nanmean(block(block.Date == day, :).sz), days));
+    end;
+    for j = 1:length(cids)
+        loc = logical(T.compid == cids(j));
+        ts = T(loc, :);
+        pos = ismember(S.Date, ts.Date);
+        res = S(:, ts.Sector(1));
+        indsz(loc) = table2array(res(pos, :));
+    end;
     
     
     % trading activity
@@ -205,6 +250,7 @@
         res = func(tmpl);
         tvol1m(loc) = res(pos, :);
     end;
+    tvol1m(~isfinite(tvol1m)) = nan;
     
     tvol3m = nan(shape);
     func = @(ts) erplib.shift(log(erplib.ma(ts.Adj_Volume, 3)), 1);
@@ -217,6 +263,7 @@
         res = func(tmpl);
         tvol3m(loc) = res(pos, :);
     end;
+    tvol3m(~isfinite(tvol3m)) = nan;
     
     turn1m = nan(shape);
     func = @(ts) log(erplib.shift(ts.Adj_Volume, 1) ./ ts.shareswa);
@@ -244,7 +291,7 @@
     end;
     
     sdturn = nan(shape);
-    func = @(ts) erplib.std(ts.turn1m, 12);
+    func = @(ts) erplib.std(ts.turn1m, 12); % TODO: chi-sqr -> norm
     days = unique(T.Date);
     H = length(days);
     W = 2;
@@ -287,8 +334,30 @@
         stp(loc) = res(pos, :);
     end;
     
+    indetp = nan(shape);
+    days = unique(T.Date);
+    sectors = unique(T.Sector);
+    H = length(days);
+    W = 1 + length(sectors);
+    S = array2table(nan([H, W]));
+    S.Properties.VariableNames = {'Date', sectors{:}};
+    S.Date = days;
+    M = table(T.Date, etp, 'VariableNames', {'Date', 'etp'});
+    for j = 1:length(sectors) % cross-sectional
+        block = M(strcmp(T.Sector, sectors(j)), :);
+        S(:, sectors(j)) = ...
+            array2table(arrayfun(@(day) nanmean(block(block.Date == day, :).etp), days));
+    end;
+    for j = 1:length(cids)
+        loc = logical(T.compid == cids(j));
+        ts = T(loc, :);
+        pos = ismember(S.Date, ts.Date);
+        res = S(:, ts.Sector(1));
+        indetp(loc) = table2array(res(pos, :));
+    end;
     
-    % growth
+    
+    % growth (ratios)
     agr = nan(shape);
     func = @(ts) (erplib.ma(ts.assets, 12) -  erplib.ma(ts.assets, 24)) ...
                 ./ erplib.ma(ts.assets, 24);
@@ -316,6 +385,9 @@
         res = func(tmpl);
         egr12m(loc) = res(pos, :);
     end;
+    egr12m(egr12m < -10) = -10;
+    egr12m(egr12m > 10) = 10;
+    egr12m = egr12m / 10;
     
     egr24m = nan(shape);
     func = @(ts) (erplib.ma(ts.epsusd, 12) -  erplib.ma(ts.epsusd, 24)) ...
@@ -329,9 +401,12 @@
         res = func(tmpl);
         egr24m(loc) = res(pos, :);
     end;
+    egr24m(egr24m < -10) = -10;
+    egr24m(egr24m > 10) = 10;
+    egr24m = egr24m / 10;
     
     rdtsz = nan(shape);
-    func = @(ts) log(erplib.ma(ts.rnd ./ ts.marketcap, 12));
+    func = @(ts) erplib.ma(ts.rnd ./ ts.marketcap, 12); % TODO: better shape after log
     tmpl = template;
     for j = 1:length(cids)
         loc = logical(T.compid == cids(j));
@@ -340,6 +415,28 @@
         tmpl(pos, :) = ts;
         res = func(tmpl);
         rdtsz(loc) = res(pos, :);
+    end;
+    
+    indagr = nan(shape);
+    days = unique(T.Date);
+    sectors = unique(T.Sector);
+    H = length(days);
+    W = 1 + length(sectors);
+    S = array2table(nan([H, W]));
+    S.Properties.VariableNames = {'Date', sectors{:}};
+    S.Date = days;
+    M = table(T.Date, agr, 'VariableNames', {'Date', 'agr'});
+    for j = 1:length(sectors) % cross-sectional
+        block = M(strcmp(T.Sector, sectors(j)), :);
+        S(:, sectors(j)) = ...
+            array2table(arrayfun(@(day) nanmean(block(block.Date == day, :).agr), days));
+    end;
+    for j = 1:length(cids)
+        loc = logical(T.compid == cids(j));
+        ts = T(loc, :);
+        pos = ismember(S.Date, ts.Date);
+        res = S(:, ts.Sector(1));
+        indagr(loc) = table2array(res(pos, :));
     end;
     
     
@@ -358,6 +455,7 @@
     envr = real(envr);
     envr(envr < -30) = -30;
     envr(envr > 30) = 30;
+    envr = envr / 3;
     
     
     % dividend
@@ -376,26 +474,60 @@
     
     % leverage
     dte = T.de;
+    dte(abs(dte) > 100) = 100;
+    dte = dte / 10;
+    
+    inddte = nan(shape);
+    days = unique(T.Date);
+    sectors = unique(T.Sector);
+    H = length(days);
+    W = 1 + length(sectors);
+    S = array2table(nan([H, W]));
+    S.Properties.VariableNames = {'Date', sectors{:}};
+    S.Date = days;
+    M = table(T.Date, dte, 'VariableNames', {'Date', 'dte'});
+    for j = 1:length(sectors) % cross-sectional
+        block = M(strcmp(T.Sector, sectors(j)), :);
+        S(:, sectors(j)) = ...
+            array2table(arrayfun(@(day) nanmean(block(block.Date == day, :).dte), days));
+    end;
+    for j = 1:length(cids)
+        loc = logical(T.compid == cids(j));
+        ts = T(loc, :);
+        pos = ismember(S.Date, ts.Date);
+        res = S(:, ts.Sector(1));
+        inddte(loc) = table2array(res(pos, :));
+    end;
     
     % sentimental
     
-    % aggregasion
+    
+    % aggregation
     signals = table( ...
         mom1m, mom3m, mom6m, mom12m, chmom, indmom, ...
         beta, ...
-        gvol, idiovol, vol3m, vol6m, ...
-        sz, sznl, ...
+        gvol, idiovol, vol3m, vol6m, indvol, ...
+        sz, sznl, indsz, ...
         tvol1m, tvol3m, turn1m, turn6m, sdturn, ...
-        etp, stp, ...
-        agr, egr12m, egr24m, rdtsz, ...
+        etp, stp, indetp, ...
+        agr, egr12m, egr24m, rdtsz, indagr, ...
         envr, ...
         dy, ...
-        dte);
+        dte, inddte);
+    
     
     % ex-return
     exrtn = log(1 + T.RETMONTH) - log(1 + T.retmonth_spx);
     
     save('data.mat', 'T', 'signals', 'exrtn');
+    
+    %% range check
+    names = signals.Properties.VariableNames;
+    fprintf('------------------------------------------------------------\n');
+    for j = 1:length(names)
+        ts = table2array(signals(:, names{j}));
+        fprintf('%12s: [%6.3f, %6.3f]\n', names{j}, nanmin(ts), nanmax(ts));
+    end;
     
     
 % end
