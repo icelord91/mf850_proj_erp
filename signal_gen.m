@@ -114,6 +114,9 @@
     end;
 	indmom = indmom / 0.2642;
     
+    mktmom = erplib.shift(log(1 + T.retmonth_spx), 1);
+    mktmom = mktmom / 0.1200;
+    
     
     %% trend
     beta = nan(shape);
@@ -535,7 +538,7 @@
     
     %% aggregation
     signals = table( ...
-        mom1m, mom3m, mom6m, mom12m, chmom, indmom, ...
+        mom1m, mom3m, mom6m, mom12m, chmom, indmom, mktmom, ...
         beta, ...
         gvol, idiovol, vol3m, vol6m, indvol, ...
         sz, sznl, indsz, ...
@@ -546,11 +549,13 @@
         dy, ...
         dte, inddte);
     
+    % mkt-return
+    mkrtn = log(1 + T.retmonth_spx);
     
     % ex-return
     exrtn = log(1 + T.RETMONTH) - log(1 + T.retmonth_spx);
     
-    save('data.mat', 'T', 'signals', 'exrtn');
+    save('data.mat', 'T', 'signals', 'mkrtn', 'exrtn');
     
     %% range check
     names = signals.Properties.VariableNames;
