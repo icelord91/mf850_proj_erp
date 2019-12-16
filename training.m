@@ -57,6 +57,8 @@ net.divideParam.testRatio = 0.1;
 y = (sign(y) + 1) / 2;
 net = train(net, X', y');
 
+% Acc = 
+
 %% performance
 % view(net)
 
